@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="drawer_list_view_selected">#D2A971</color>
+    <color name="actionBar_background">#2EAD4F</color>
+    <color name="actionBar_text_color">#ffffff</color>
+    <color name="drawer_list_view_normal_back">#ffffff</color>
+    <color name="password_list_view_normal_back">#ffffff</color>
+    <color name="password_list_view_pressed">#ffb90f</color>
+    <color name="password_list_view_activated">#0399f8</color>
+    <color name="password_edit_search">#AEAEAE</color>
+</resources>

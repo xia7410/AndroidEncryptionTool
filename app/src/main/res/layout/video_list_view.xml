@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/password_list_view_selector"
+    android:descendantFocusability="blocksDescendants"
+    android:orientation="horizontal">
+
+    <CheckBox
+        android:id="@+id/video_list_view_checkBox"
+        android:layout_width="wrap_content"
+        android:layout_height="fill_parent"
+        android:clickable="false"
+        android:gravity="center_vertical"
+        android:visibility="visible"/>
+
+    <RelativeLayout
+        android:layout_width="wrap_content"
+        android:layout_height="fill_parent">
+
+        <RelativeLayout
+            android:id="@+id/temp"
+            android:layout_width="94dp"
+            android:layout_height="68dp"
+            android:layout_alignParentLeft="true"
+            android:layout_centerVertical="true"
+            android:layout_margin="10dp">
+
+            <ImageView
+                android:id="@+id/video_list_view_imageView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="centerCrop"
+                android:background="@android:color/black"/>
+
+            <TextView
+                android:id="@+id/video_list_view_textView_duration"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentBottom="true"
+                android:layout_alignParentRight="true"
+                android:background="@android:color/black"
+                android:clickable="false"
+                android:gravity="right"
+                android:paddingLeft="3dp"
+                android:paddingRight="3dp"
+                android:paddingBottom="1dp"
+                android:textColor="@android:color/white"
+                android:textSize="13sp" />
+
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:src="@drawable/round_corner_back"
+                android:scaleType="fitXY"/>
+
+
+        </RelativeLayout>
+
+        <TextView
+            android:id="@+id/video_list_view_textView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerVertical="true"
+            android:textColor="@android:color/black"
+            android:layout_toRightOf="@id/temp" />
+    </RelativeLayout>
+</LinearLayout>

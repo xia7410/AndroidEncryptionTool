@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TableLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="15dp"
+    android:shrinkColumns="1"
+    android:stretchColumns="*">
+
+    <TableRow android:layout_marginBottom="1dp">
+
+        <TextView
+            android:layout_marginRight="15dp"
+            android:text="@string/file"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/dialog_video_info_file"
+            android:textSize="15sp" />
+    </TableRow>
+
+    <TableRow android:layout_marginBottom="1dp">
+
+        <TextView
+            android:text="@string/location"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/dialog_video_info_location"
+            android:textSize="15sp" />
+    </TableRow>
+
+    <TableRow android:layout_marginBottom="1dp">
+
+        <TextView
+            android:text="@string/size"
+
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/dialog_video_info_size"
+            android:textSize="15sp" />
+    </TableRow>
+
+    <TableRow android:id="@+id/dialog_video_info_duration_row">
+
+        <TextView
+            android:text="@string/duration"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/dialog_video_info_duration"
+            android:textSize="15sp" />
+    </TableRow>
+
+
+</TableLayout>

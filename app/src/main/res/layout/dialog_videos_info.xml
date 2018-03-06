@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TableLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="15dp"
+    android:shrinkColumns="1"
+    android:stretchColumns="*">
+
+    <TableRow android:layout_marginBottom="1dp">
+
+        <TextView
+            android:layout_marginRight="15dp"
+            android:text="@string/include"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/dialog_videos_info_include"
+            android:textSize="15sp" />
+    </TableRow>
+
+    <TableRow>
+
+        <TextView
+            android:layout_marginRight="15dp"
+            android:text="@string/all_size"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/dialog_videos_info_all_size"
+            android:textSize="15sp" />
+    </TableRow>
+
+</TableLayout>
