@@ -11,6 +11,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.content.FileProvider;
+import android.support.v7.app.AlertDialog.Builder;
 import android.util.DisplayMetrics;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -25,7 +26,6 @@ import android.widget.GridView;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.support.v7.app.AlertDialog.Builder;
 
 import java.io.File;
 import java.text.DecimalFormat;
@@ -34,15 +34,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import cn.edu.ustc.software.hanyizhao.encryptiontool.bean.Image;
+import cn.edu.ustc.software.hanyizhao.encryptiontool.service.StaticData;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.FileChooser;
+import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.FileTools;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.Logger;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.ImageLoader;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.ImageLoaderActivity;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.DisplayUtil;
-import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.TaskType;
-import cn.edu.ustc.software.hanyizhao.encryptiontool.service.StaticData;
-import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.FileTools;
-import cn.edu.ustc.software.hanyizhao.encryptiontool.bean.Image;
 
 
 /**
@@ -179,7 +178,7 @@ public class ImageFragment extends android.support.v4.app.Fragment implements Vi
         Context context = ImageFragment.this.getContext();
         String[] paths = new String[trueRemovedPaths.size()];
         trueRemovedPaths.toArray(paths);
-        AddVideoImage.ScanFile(paths, context);
+        AddVideoImage.ScanFile(paths, context, false);
         OutMultiSelect();
     }
 
@@ -189,7 +188,7 @@ public class ImageFragment extends android.support.v4.app.Fragment implements Vi
         switch (id) {
             case R.id.video_image_menu_add: {
                 Intent i = new Intent(this.getContext(), ImageLoaderActivity.class);
-                i.putExtra("all", true);
+                i.putExtra("image", true);
                 startActivityForResult(i, VideoFragment.requestCode_SELECT);
                 break;
             }
@@ -251,7 +250,6 @@ public class ImageFragment extends android.support.v4.app.Fragment implements Vi
                     }
                 });
                 startB.show();
-
                 break;
             }
             case R.id.video_menu_delete: {
@@ -401,7 +399,7 @@ public class ImageFragment extends android.support.v4.app.Fragment implements Vi
                 holder = (ViewHolder) convertView.getTag();
             }
             Image image = list.get(position);
-            ImageLoader.getInstance().loadImage("image" + image.id + "", holder.imageView, null, TaskType.IMAGE_DB_IMAGE);
+            ImageLoader.getInstance().loadImage("image" + image.id + "", holder.imageView, null, StaticData.getInstance());
             if (isInMultiSelect) {
                 holder.imageButton.setImageResource(selected.contains(position) ?
                         R.drawable.photo_selected : R.drawable.photo_no_selected);

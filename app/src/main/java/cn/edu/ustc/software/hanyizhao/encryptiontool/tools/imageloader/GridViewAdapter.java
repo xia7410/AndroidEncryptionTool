@@ -13,12 +13,12 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import cn.edu.ustc.software.hanyizhao.encryptiontool.R;
+import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.DefaultImageThumbnailGetter;
+import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.DefaultVideoThumbnailGetter;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.DisplayUtil;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.FolderBean;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.MediaPath;
-import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.TaskType;
 
-import java.lang.ref.WeakReference;
 import java.util.Set;
 
 public class GridViewAdapter extends BaseAdapter {
@@ -27,19 +27,28 @@ public class GridViewAdapter extends BaseAdapter {
 
     private FolderBean folderBean;
     private LayoutInflater inflater;
-    private Context context;
 
-    private WeakReference<OnSelectedListener> selectedListener;
+    private OnSelectedListener selectedListener;
 
     public void setOnSelectedListener(OnSelectedListener listener) {
-        selectedListener = new WeakReference<OnSelectedListener>(listener);
+        selectedListener = listener;
     }
 
+    public FolderBean getFolderBean() {
+        return folderBean;
+    }
+
+    /**
+     * Constructor.
+     *
+     * @param context    context
+     * @param folderBean Information of this folder.
+     * @param mSelected
+     */
     public GridViewAdapter(Context context, FolderBean folderBean, Set<MediaPath> mSelected) {
         this.mSelected = mSelected;
         this.folderBean = folderBean;
         this.inflater = LayoutInflater.from(context);
-        this.context = context;
         //计算宽高
         WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         DisplayMetrics displayMetrics = new DisplayMetrics();
@@ -82,9 +91,9 @@ public class GridViewAdapter extends BaseAdapter {
         } else {
             viewHolder = (ViewHolder) convertView.getTag();
         }
-        final MediaPath mediaPath = folderBean.files.get(position);
-        final String path = folderBean.briefMode ? folderBean.folder.getAbsolutePath() + "/" + mediaPath.path : mediaPath.path;
-        final MediaPath temp = new MediaPath(mediaPath.type, path, mediaPath.duration);
+        MediaPath mediaPath = folderBean.files.get(position);
+        String path = folderBean.briefMode ? folderBean.folder.getAbsolutePath() + "/" + mediaPath.path : mediaPath.path;
+        final MediaPath absolutePath = new MediaPath(mediaPath.isVideo, path, mediaPath.modify, mediaPath.duration);
         final ViewHolder finalViewHolder = viewHolder;
         ImageView imageView = viewHolder.imageView;
         ImageButton imageButton = viewHolder.imageButton;
@@ -99,7 +108,7 @@ public class GridViewAdapter extends BaseAdapter {
             layoutParams.height = buttonWidthPixels;
             imageButton.setPadding(0, buttonPaddingPixels, buttonPaddingPixels, 0);
         }
-        if (mediaPath.type == TaskType.VIDEO) {
+        if (mediaPath.isVideo) {
             textView.setVisibility(View.VISIBLE);
             textView.setText(mediaPath.duration);
             camera.setVisibility(View.VISIBLE);
@@ -107,35 +116,30 @@ public class GridViewAdapter extends BaseAdapter {
             textView.setVisibility(View.INVISIBLE);
             camera.setVisibility(View.INVISIBLE);
         }
-        ImageLoader.getInstance().loadImage(path, imageView, R.drawable.no_photo, mediaPath.type);
+        ImageLoader.getInstance().loadImage(path, imageView, R.drawable.no_photo,
+                mediaPath.isVideo ? DefaultVideoThumbnailGetter.getInstance() : DefaultImageThumbnailGetter.getInstance());
         imageView.setOnClickListener(null);
         imageView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (mSelected.contains(temp)) {
-                    mSelected.remove(temp);
+                if (mSelected.contains(absolutePath)) {
+                    mSelected.remove(absolutePath);
                     if (selectedListener != null) {
-                        OnSelectedListener onSelectedListener = selectedListener.get();
-                        if (onSelectedListener != null) {
-                            onSelectedListener.onRemove(new MediaPath(mediaPath.type, path, mediaPath.duration));
-                        }
+                        selectedListener.onRemove();
                     }
                     finalViewHolder.imageView.setColorFilter(null);
                     finalViewHolder.imageButton.setImageResource(R.drawable.photo_no_selected);
                 } else {
-                    mSelected.add(temp);
+                    mSelected.add(absolutePath);
                     if (selectedListener != null) {
-                        OnSelectedListener onSelectedListener = selectedListener.get();
-                        if (onSelectedListener != null) {
-                            onSelectedListener.onSelected(new MediaPath(mediaPath.type, path, mediaPath.duration));
-                        }
+                        selectedListener.onSelected();
                     }
                     finalViewHolder.imageButton.setImageResource(R.drawable.photo_selected);
                     finalViewHolder.imageView.setColorFilter(Color.parseColor("#77000000"));
                 }
             }
         });
-        if (mSelected.contains(temp)) {
+        if (mSelected.contains(absolutePath)) {
             finalViewHolder.imageButton.setImageResource(R.drawable.photo_selected);
             finalViewHolder.imageView.setColorFilter(Color.parseColor("#77000000"));
         } else {
@@ -153,8 +157,8 @@ public class GridViewAdapter extends BaseAdapter {
     }
 
     interface OnSelectedListener {
-        void onSelected(MediaPath mediaPath);
+        void onSelected();
 
-        void onRemove(MediaPath mediaPath);
+        void onRemove();
     }
 }

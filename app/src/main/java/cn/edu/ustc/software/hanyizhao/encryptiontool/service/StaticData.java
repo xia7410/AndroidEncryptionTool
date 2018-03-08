@@ -3,6 +3,7 @@ package cn.edu.ustc.software.hanyizhao.encryptiontool.service;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Environment;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import java.io.File;
@@ -12,17 +13,17 @@ import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
 
-import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.AESTools;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.DBTools;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.FileTools;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.bean.Image;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.bean.Password;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.bean.Video;
+import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.CanGetThumbnailLater;
 
 /**
  * Created by HanYizhao on 2015/9/22.
  */
-public class StaticData {
+public class StaticData implements CanGetThumbnailLater {
 
     /**
      * 不能修改！作用：在对密码求解SHA值的时候，增加随机性，比如123的SHA大家都知道，但是123加上这个字符串之后
@@ -643,5 +644,23 @@ public class StaticData {
         } else {
             return false;
         }
+    }
+
+    @Override
+    public Bitmap getThumbnailLaterMaybe(String path, int recommendedWidth) {
+        Bitmap result = null;
+        if (path != null && path.length() > 5) {
+            String front = path.substring(0, 5);
+            try {
+                if (front.equals("video")) {
+                    result = getTh(Integer.valueOf(path.substring(5)), true);
+                } else if (front.equals("image")) {
+                    result = getTh(Integer.valueOf(path.substring(5)), false);
+                }
+            } catch (NumberFormatException e) {
+                e.printStackTrace();
+            }
+        }
+        return result;
     }
 }

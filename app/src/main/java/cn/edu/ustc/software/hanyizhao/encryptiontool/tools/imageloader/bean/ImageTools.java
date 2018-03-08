@@ -11,18 +11,19 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.Locale;
 
 /**
  * Created by HanYizhao on 2015/12/24.
  * 处理图片
  * （生成视频截图）
  * （生成图片缩略图）
- *
  */
 public class ImageTools {
     /**
      * 生成视频缩略图
-     * @param path 视频绝对路径
+     *
+     * @param path           视频绝对路径
      * @param recommendWidth 推荐宽度，默认0,会转为200
      * @return 图片
      */
@@ -43,7 +44,8 @@ public class ImageTools {
 
     /**
      * 生成图片缩略图
-     * @param path 图片完整路径
+     *
+     * @param path           图片完整路径
      * @param recommendWidth 推荐宽度 可以为0
      * @return 图片
      */
@@ -121,17 +123,37 @@ public class ImageTools {
         return result;
     }
 
+    public static String getDurationString(long milliseconds) {
+        int iDuration = (int) (milliseconds / 1000);
+        StringBuilder sb = new StringBuilder();
+        if (iDuration >= 3600) {
+            sb.append(iDuration / 3600);
+            sb.append(":");
+            iDuration = iDuration % 3600;
+        }
+        if (iDuration > 60) {
+            sb.append(String.format(Locale.getDefault(), "%02d", iDuration / 60));
+            sb.append(":");
+            iDuration = iDuration % 60;
+        } else {
+            sb.append("00:");
+        }
+        sb.append(String.format(Locale.getDefault(), "%02d", iDuration));
+        return sb.toString();
+    }
+
     /**
      * 将图片保存在存储卡中
+     *
      * @param bitmap 图片
-     * @param path 路径
+     * @param path   路径
      * @return 结果
      */
-    public static boolean saveBitmap(Bitmap bitmap, String path){
+    public static boolean saveBitmap(Bitmap bitmap, String path) {
         boolean result = false;
-        if(bitmap != null && path != null){
+        if (bitmap != null && path != null) {
             File file = new File(path);
-            if(!file.getParentFile().exists()){
+            if (!file.getParentFile().exists()) {
                 file.getParentFile().mkdirs();
             }
             FileOutputStream fos = null;
@@ -141,7 +163,7 @@ public class ImageTools {
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             } finally {
-                if(fos != null){
+                if (fos != null) {
                     try {
                         fos.close();
                     } catch (IOException e) {

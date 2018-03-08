@@ -34,11 +34,11 @@ import java.util.Set;
 
 import cn.edu.ustc.software.hanyizhao.encryptiontool.bean.Video;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.service.StaticData;
+import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.FileChooser;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.FileTools;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.Logger;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.ImageLoader;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.ImageLoaderActivity;
-import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.TaskType;
 
 /**
  * Created by hanyizhao on 15-10-16.
@@ -153,13 +153,60 @@ public class VideoFragment extends Fragment implements FragmentHandler.OnAddFini
         super.onCreateOptionsMenu(menu, inflater);
     }
 
+    private void removeVideos(String newPath) {
+        List<String> trueRemovedPaths = new ArrayList<>();
+        List<Integer> trueRemoved = new ArrayList<>();
+        for (Integer i : selected) {
+            Video video = data.get(i);
+            File nowFile = new File(StaticData.fromVideoIdToSavePath(video.id));
+            FileTools.decrypt(nowFile,
+                    StaticData.getInstance().getRealPassword());
+
+            File tempF;
+            if (newPath == null) {
+                tempF = new File(video.path);
+            } else {
+                tempF = new File(newPath, new File(video.path).getName());
+            }
+            //有重名，寻找没有重名的路径
+            if (tempF.exists()) {
+                int l = 1;
+                File parent = tempF.getParentFile();
+                //记录后缀
+                String last = "";
+                if (tempF.getName().contains(".")) {
+                    last = tempF.getName().substring(tempF.getName().lastIndexOf('.'));
+                }
+                do {
+                    tempF = new File(parent, video.name + "(" + l + ")" + last);
+                    if (!tempF.exists()) {
+                        break;
+                    }
+                    l++;
+                } while (true);
+            }
+            if (FileTools.MoveFile(nowFile.getAbsolutePath(), tempF.getAbsolutePath())) {
+                trueRemoved.add(video.id);
+                trueRemovedPaths.add(video.path);
+            }
+        }
+        for (int i : trueRemoved) {
+            StaticData.getInstance().deleteVideo(i);
+        }
+        Context context = VideoFragment.this.getContext();
+        String[] paths = new String[trueRemovedPaths.size()];
+        trueRemovedPaths.toArray(paths);
+        AddVideoImage.ScanFile(paths, context, true);
+        OutMultiSelect();
+    }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         final int id = item.getItemId();
         switch (id) {
             case R.id.video_image_menu_add: {
                 Intent i = new Intent(this.getContext(), ImageLoaderActivity.class);
-                i.putExtra("all", true);
+                i.putExtra("video", true);
                 startActivityForResult(i, requestCode_SELECT);
                 break;
             }
@@ -180,55 +227,47 @@ public class VideoFragment extends Fragment implements FragmentHandler.OnAddFini
                 break;
             }
             case R.id.video_menu_remove: {
-                Builder b = new Builder(this.getContext());
-                b.setTitle(R.string.remove);
-                b.setMessage("确认移除这" + selected.size() + "个视频吗？\n（恢复至原目录）");
-                b.setNegativeButton(R.string.Cancel, null);
-                b.setPositiveButton(R.string.OK, new DialogInterface.OnClickListener() {
+                Builder startB = new Builder(this.getContext());
+                startB.setTitle(R.string.remove_to);
+                startB.setItems(R.array.remove_file_options, new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
-                        List<String> trueRemovedPaths = new ArrayList<>();
-                        List<Integer> trueRemoved = new ArrayList<>();
-                        for (Integer i : selected) {
-                            Video video = data.get(i);
-                            File nowFile = new File(StaticData.fromVideoIdToSavePath(video.id));
-                            FileTools.decrypt(nowFile,
-                                    StaticData.getInstance().getRealPassword());
-                            String path = video.path;
-                            File tempF = new File(path);
-                            //有重名，寻找没有重名的路径
-                            if (tempF.exists()) {
-                                int l = 1;
-                                File parent = tempF.getParentFile();
-                                //记录后缀
-                                String last = "";
-                                if (tempF.getName().contains(".")) {
-                                    last = tempF.getName().substring(tempF.getName().lastIndexOf('.'));
+                        if (which == 0) {
+                            Builder b = new Builder(VideoFragment.this.getContext());
+                            b.setTitle(R.string.remove);
+                            b.setMessage("确认移除这" + selected.size() + "个视频吗？\n（恢复至原目录）");
+                            b.setNegativeButton(R.string.Cancel, null);
+                            b.setPositiveButton(R.string.OK, new DialogInterface.OnClickListener() {
+                                @Override
+                                public void onClick(DialogInterface dialog, int which) {
+                                    removeVideos(null);
                                 }
-                                do {
-                                    tempF = new File(parent, video.name + "(" + l + ")" + last);
-                                    if (!tempF.exists()) {
-                                        break;
-                                    }
-                                    l++;
-                                } while (true);
-                            }
-                            if (FileTools.MoveFile(nowFile.getAbsolutePath(), tempF.getAbsolutePath())) {
-                                trueRemoved.add(video.id);
-                                trueRemovedPaths.add(video.path);
-                            }
+                            });
+                            b.show();
+                        } else {
+                            FileChooser fileChooser = new FileChooser();
+                            fileChooser.getFilePath(VideoFragment.this.getContext(), new String[]{}, "",
+                                    new FileChooser.selectOneFileResult() {
+                                        @Override
+                                        public void selectOneFile(File f) {
+                                            Builder b = new Builder(VideoFragment.this.getContext());
+                                            b.setTitle(R.string.remove);
+                                            final String newPath = f.getAbsolutePath();
+                                            b.setMessage("确认移除这" + selected.size() + "个视频吗？\n恢复至：\n" + newPath);
+                                            b.setNegativeButton(R.string.Cancel, null);
+                                            b.setPositiveButton(R.string.OK, new DialogInterface.OnClickListener() {
+                                                @Override
+                                                public void onClick(DialogInterface dialog, int which) {
+                                                    removeVideos(newPath);
+                                                }
+                                            });
+                                            b.show();
+                                        }
+                                    }, FileChooser.FileMode.ONEDICTIONARY);
                         }
-                        for (int i : trueRemoved) {
-                            StaticData.getInstance().deleteVideo(i);
-                        }
-                        Context context = VideoFragment.this.getContext();
-                        String[] paths = new String[trueRemovedPaths.size()];
-                        trueRemovedPaths.toArray(paths);
-                        AddVideoImage.ScanFile(paths, context);
-                        OutMultiSelect();
                     }
                 });
-                b.show();
+                startB.show();
                 break;
             }
             case R.id.video_menu_delete: {
@@ -387,7 +426,7 @@ public class VideoFragment extends Fragment implements FragmentHandler.OnAddFini
             Video video = list.get(position);
             holder.textView.setText(video.name);
             holder.duration.setText(video.duration);
-            ImageLoader.getInstance().loadImage("video" + video.id + "", holder.imageView, null, TaskType.IMAGE_DB_VIDEO);
+            ImageLoader.getInstance().loadImage("video" + video.id + "", holder.imageView, null, StaticData.getInstance());
             if (isInMultiSelect) {
                 holder.checkBox.setChecked(selected.contains(position));
                 holder.checkBox.setVisibility(View.VISIBLE);

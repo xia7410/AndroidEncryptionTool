@@ -21,21 +21,24 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 import cn.edu.ustc.software.hanyizhao.encryptiontool.R;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.service.StaticData;
+import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.Logger;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.FolderBean;
+import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.ImageTools;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.MediaPath;
+import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.MyImageAndVideoFilter;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.MyImageFilter;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.MyVideoFilter;
-import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.TaskType;
 
 public class ImageLoaderActivity extends AppCompatActivity implements PopupWindowListDir.OnPopupWindowListDirSelectListener, GridViewAdapter.OnSelectedListener {
 
@@ -49,12 +52,102 @@ public class ImageLoaderActivity extends AppCompatActivity implements PopupWindo
     private Set<MediaPath> mSelected = new HashSet<>();
 
     private boolean hasVideo = false;
+    private boolean hasImage = false;
 
-    List<FolderBean> l = new ArrayList<>();
+    private boolean scanWholeSDThreadShouldStop = false;
+
+    HashSet<String> alreadyHave = new HashSet<>();
+    HashMap<String, FolderBean> subFolder = new HashMap<>();
+    FolderBean allFilesFolder, allVideoFolder;
     ImageLoaderHandler imageLoaderHandler;
 
-    private static int compareLong(long x, long y) {
-        return (x < y) ? -1 : ((x == y) ? 0 : 1);
+    private class ScanWholeSDThread extends Thread {
+
+        private FileFilter fileFilter;
+        private FileFilter myVideoFilter = new MyVideoFilter();
+        private FileFilter directionFileFilter = new FileFilter() {
+            @Override
+            public boolean accept(File pathname) {
+                return pathname.isDirectory() && pathname.canWrite()
+                        && !pathname.isHidden();
+            }
+        };
+
+        private ArrayList<String> newFiles = new ArrayList<>();
+        private ArrayList<Boolean> newFilesIsVideo = new ArrayList<>();
+        private long startTime;
+
+        ScanWholeSDThread() {
+            if (hasImage && hasVideo) {
+                fileFilter = new MyImageAndVideoFilter();
+            } else if (hasImage) {
+                fileFilter = new MyImageFilter();
+            } else if (hasVideo) {
+                fileFilter = new MyVideoFilter();
+            } else {
+                fileFilter = new MyImageAndVideoFilter();
+            }
+        }
+
+        private void sendMessage() {
+            if (newFiles.size() > 0) {
+                Message message = imageLoaderHandler.obtainMessage(ImageLoaderHandler.NEW_FILES);
+                Bundle bundle = new Bundle();
+                bundle.putStringArrayList("value", newFiles);
+                boolean[] bA = new boolean[newFilesIsVideo.size()];
+                {
+                    for (int i = 0; i < newFilesIsVideo.size(); i++) {
+                        bA[i] = newFilesIsVideo.get(i);
+                    }
+                }
+                bundle.putBooleanArray("isVideo", bA);
+                message.setData(bundle);
+                message.sendToTarget();
+                newFiles = new ArrayList<>();
+                newFilesIsVideo = new ArrayList<>();
+            }
+            startTime = System.currentTimeMillis();
+        }
+
+        private void scanOneFolder(File file) {
+            if (file.isDirectory() && !new File(file, ".nomedia").exists() && !scanWholeSDThreadShouldStop) {
+                if (System.currentTimeMillis() - startTime > 1000) {
+                    sendMessage();
+                }
+                File[] files = file.listFiles(fileFilter);
+                if (files != null) {
+                    for (File i : files) {
+                        String path = i.getAbsolutePath();
+                        if (!alreadyHave.contains(path.toLowerCase())) {
+                            newFiles.add(path);
+                            newFilesIsVideo.add(myVideoFilter.accept(i));
+                        }
+                    }
+                }
+                files = file.listFiles(directionFileFilter);
+                if (files != null) {
+                    for (File i : files) {
+                        scanOneFolder(i);
+                    }
+                }
+            }
+        }
+
+        @Override
+        public void run() {
+            Logger.e("Thread Start:", "ID: " + Thread.currentThread().getId());
+            try {
+                startTime = System.currentTimeMillis();
+                File f = Environment.getExternalStorageDirectory();
+                scanOneFolder(f);
+                if (!scanWholeSDThreadShouldStop) {
+                    sendMessage();
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            Logger.e("Thread Stop:", "ID: " + Thread.currentThread().getId());
+        }
     }
 
     public void hideProgressDialog() {
@@ -64,11 +157,19 @@ public class ImageLoaderActivity extends AppCompatActivity implements PopupWindo
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        hasVideo = getIntent().getBooleanExtra("all", false);
-        if (hasVideo) {
+        Intent intent = getIntent();
+        hasImage = intent.getBooleanExtra("image", false);
+        hasVideo = intent.getBooleanExtra("video", false);
+        if (hasVideo && hasImage) {
             setTitle(getString(R.string.image_and_video));
-        } else {
+        } else if (hasImage) {
             setTitle(getString(R.string.all_images));
+        } else if (hasVideo) {
+            setTitle(getString(R.string.all_videos));
+        } else {
+            hasImage = true;
+            hasVideo = true;
+            setTitle(getString(R.string.image_and_video));
         }
         setContentView(R.layout.activity_image_loader);
         ActionBar ab = getSupportActionBar();
@@ -93,8 +194,37 @@ public class ImageLoaderActivity extends AppCompatActivity implements PopupWindo
     }
 
 
+    private List<FolderBean> preparePopUpWindowData() {
+        List<FolderBean> allFolder = new ArrayList<>();
+        if (hasImage) {
+            allFolder.add(allFilesFolder);
+        }
+        if (hasVideo) {
+            allFolder.add(allVideoFolder);
+        }
+        if (hasImage) {
+            List<FolderBean> tmp = new ArrayList<>(subFolder.values());
+            Collections.sort(tmp, new Comparator<FolderBean>() {
+                @Override
+                public int compare(FolderBean f1, FolderBean f2) {
+                    long y = 0, x = 0;
+                    if (f1.files.size() > 0) {
+                        y = f1.files.get(0).modify;
+                    }
+                    if (f2.files.size() > 0) {
+                        x = f2.files.get(0).modify;
+                    }
+                    return (x < y) ? -1 : ((x == y) ? 0 : 1);
+                }
+            });
+            allFolder.addAll(tmp);
+        }
+        return allFolder;
+    }
+
     public void initPopupWindow() {
-        mPopupWindowListDir = new PopupWindowListDir(this, l);
+        List<FolderBean> allFolder = preparePopUpWindowData();
+        mPopupWindowListDir = new PopupWindowListDir(this, allFolder);
         mPopupWindowListDir.setOnDismissListener(new PopupWindow.OnDismissListener() {
             @Override
             public void onDismiss() {
@@ -126,255 +256,178 @@ public class ImageLoaderActivity extends AppCompatActivity implements PopupWindo
 
     }
 
-    public void initAdapter(int position) {
-        adapter = new GridViewAdapter(this, l.get(position), mSelected);
+    public void handlerFindNewFiles(List<String> newFiles, boolean[] newFilesIsVideo) {
+        HashSet<FolderBean> needSortFolder = new HashSet<>();
+        for (int i = 0; i < newFiles.size(); i++) {
+            String filePath = newFiles.get(i);
+            File file = new File(filePath);
+            long lastModify = file.lastModified();
+            if (newFilesIsVideo[i]) {
+                long iDuration = 0;
+                MediaMetadataRetriever mmr = new MediaMetadataRetriever();
+                try {
+                    mmr.setDataSource(filePath);
+                    iDuration = Integer.valueOf(mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION));
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+                MediaPath videoPath = new MediaPath(true, filePath,
+                        lastModify, ImageTools.getDurationString(iDuration));
+                allVideoFolder.files.add(videoPath);
+                needSortFolder.add(allVideoFolder);
+                if (hasImage) {
+                    allFilesFolder.files.add(videoPath);
+                    needSortFolder.add(allFilesFolder);
+                }
+            } else {
+                MediaPath imagePath = new MediaPath(false, filePath, lastModify);
+                allFilesFolder.files.add(imagePath);
+                needSortFolder.add(allFilesFolder);
+                String parent = file.getParent().toLowerCase();
+                FolderBean target = subFolder.get(parent);
+                if (target == null) {
+                    target = new FolderBean();
+                    target.briefMode = true;
+                    target.folder = file.getParentFile();
+                    target.folderName = target.folder.getName();
+                    subFolder.put(parent, target);
+                }
+                target.files.add(new MediaPath(false, file.getName(), lastModify));
+                needSortFolder.add(target);
+            }
+        }
+        for (FolderBean i : needSortFolder) {
+            Collections.sort(i.files);
+        }
+        mPopupWindowListDir.refreshFolderBean(preparePopUpWindowData());
+        if (needSortFolder.contains(adapter.getFolderBean())) {
+            adapter.notifyDataSetChanged();
+            mDirCount.setText(adapter.getFolderBean().files.size() + "");
+        }
+    }
+
+    public void handlerScanFinished() {
+        hideProgressDialog();
+        FolderBean selected = hasImage ? allFilesFolder : allVideoFolder;
+        selected.isSelected = true;
+        initAdapter(selected);
+        initPopupWindow();
+        Thread scanWholeSDThread = new ScanWholeSDThread();
+        scanWholeSDThread.start();
+    }
+
+    public void initAdapter(FolderBean selected) {
+        adapter = new GridViewAdapter(this, selected, mSelected);
         gridView.setAdapter(adapter);
         adapter.setOnSelectedListener(this);
-        mDirName.setText(l.get(position).folderName);
-        mDirCount.setText(l.get(position).files.size() + "张");
+        mDirName.setText(selected.folderName);
+        mDirCount.setText(selected.files.size() + "");
     }
 
     @Override
-    public void onSelected(MediaPath mediaPath) {
+    public void onSelected() {
         supportInvalidateOptionsMenu();
     }
 
     @Override
-    public void onRemove(MediaPath mediaPath) {
+    public void onRemove() {
         supportInvalidateOptionsMenu();
     }
 
-    private class SortHelp {
-        int modifyTime;
-        MediaPath mediaPath;
-
-
-        public SortHelp(int modifyTime, String path, TaskType type, String duration) {
-            this.modifyTime = modifyTime;
-            this.mediaPath = new MediaPath(type, path, duration);
-        }
-
-
-    }
 
     private void initDatas() {
         if (!Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
-            Toast.makeText(this, "当前存储卡不可用", Toast.LENGTH_SHORT);
+            StaticData.getInstance().showMessage("当前存储卡不可用", this);
             return;
         }
-        final List<SortHelp> sortHelps = new ArrayList<>(150);
         mProgressDialog = ProgressDialog.show(this, null, getResources().getString(R.string.loading___));
-        FolderBean recentDir = new FolderBean();
-        if (hasVideo) {
-            recentDir.folderName = getResources().getString(R.string.image_and_video);
-        } else {
-            recentDir.folderName = getResources().getString(R.string.all_images);
+        if (hasImage) {
+            allFilesFolder = new FolderBean();
+            if (hasVideo) {
+                allFilesFolder.folderName = getResources().getString(R.string.image_and_video);
+            } else {
+                allFilesFolder.folderName = getResources().getString(R.string.all_images);
+            }
         }
-        recentDir.briefMode = false;
-        l.add(recentDir);
         if (hasVideo) {
-            FolderBean videoBean = new FolderBean();
-            videoBean.folderName = getResources().getString(R.string.all_videos);
-            videoBean.briefMode = false;
-            l.add(videoBean);
+            allVideoFolder = new FolderBean();
+            allVideoFolder.isVideoFolder = true;
+            allVideoFolder.folderName = getResources().getString(R.string.all_videos);
         }
         imageLoaderHandler = new ImageLoaderHandler(this);
         new Thread() {
             @Override
             public void run() {
-                Set<String> imageFolders = new HashSet<>();
-                Set<String> videoFolders = new HashSet<>();
-                List<String> imageFolderList = new ArrayList<String>();
-                List<String> videoFolderList = new ArrayList<String>();
-                Cursor cursor = getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                        new String[]{
-                                MediaStore.Images.Media.DATA,},
-                        null,
-                        null,
-                        null);
-                if (cursor != null) {
-                    try {
+                // Get Images from MediaStore.
+                if (hasImage) {
+                    Cursor cursor = getContentResolver().query(MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                            new String[]{
+                                    MediaStore.Images.Media.DATA, MediaStore.Images.Media.DATE_MODIFIED},
+                            null,
+                            null,
+                            null);
+                    if (cursor != null) {
                         while (cursor.moveToNext()) {
-                            String path = cursor.getString(cursor.getColumnIndex(MediaStore.Images.Media.DATA));
-                            String parent = path.substring(0, path.lastIndexOf('/'));
-                            if (!imageFolders.contains(parent)) {
-                                imageFolders.add(parent);
+                            MediaPath mediaPath = new MediaPath(false, cursor.getString(0),
+                                    cursor.getLong(1) * 1000);
+                            File newFile = new File(mediaPath.path);
+                            if (newFile.exists()) {
+                                alreadyHave.add(mediaPath.path.toLowerCase());
+                                allFilesFolder.files.add(mediaPath);
+                                String parent = newFile.getParent().toLowerCase();
+                                FolderBean target = subFolder.get(parent);
+                                if (target == null) {
+                                    target = new FolderBean();
+                                    target.briefMode = true;
+                                    target.folder = newFile.getParentFile();
+                                    target.folderName = target.folder.getName();
+                                    subFolder.put(parent, target);
+                                }
+                                target.files.add(new MediaPath(false, newFile.getName(), mediaPath.modify));
                             }
                         }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    } finally {
                         cursor.close();
                     }
-                    fromSetToList(imageFolders, imageFolderList);
-                    MyImageFilter imageFilter = new MyImageFilter();
-                    //遍历所有文件夹
-                    for (String i : imageFolderList) {
-                        File nowFile = new File(i);
-                        File[] files = nowFile.listFiles(imageFilter);
-                        Arrays.sort(files, new Comparator<File>() {
-                            @Override
-                            public int compare(File lhs, File rhs) {
-                                return compareLong(rhs.lastModified(), lhs.lastModified());
-                            }
-                        });
-                        if (files.length > 0) {
-                            FolderBean folderBean = new FolderBean();
-                            folderBean.briefMode = true;
-                            folderBean.folder = nowFile;
-                            folderBean.folderName = nowFile.getName();
-                            for (File f : files) {
-                                MediaPath mediaPath = new MediaPath(TaskType.IMAGE, f.getName());
-                                folderBean.files.add(mediaPath);
-                                sortHelps.add(new SortHelp((int) (f.lastModified() / 1000), f.getAbsolutePath(), TaskType.IMAGE, null));
-                            }
-                            l.add(folderBean);
-                        }
-                    }
-                    if (hasVideo) {
-                        cursor = getContentResolver().query(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                                new String[]{
-                                        MediaStore.Video.Media.DATA,},
-                                null,
-                                null,
-                                null);
-                        if (cursor != null) {
-                            try {
-                                while (cursor.moveToNext()) {
-                                    String path = cursor.getString(cursor.getColumnIndex(MediaStore.Video.Media.DATA));
-                                    String parent = path.substring(0, path.lastIndexOf('/'));
-                                    if (!videoFolders.contains(parent)) {
-                                        videoFolders.add(parent);
-                                    }
-                                }
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                            } finally {
-                                cursor.close();
-                            }
-                        }
-                        fromSetToList(videoFolders, videoFolderList);
-                        MyVideoFilter videoFilter = new MyVideoFilter();
-                        //遍历所有文件夹
-                        for (String i : videoFolderList) {
-                            File nowFile = new File(i);
-                            File[] files = nowFile.listFiles(videoFilter);
-                            Arrays.sort(files, new Comparator<File>() {
-                                @Override
-                                public int compare(File lhs, File rhs) {
-                                    return compareLong(rhs.lastModified(), lhs.lastModified());
-                                }
-                            });
-                            if (files.length > 0) {
-                                for (File f : files) {
-                                    int iDuration = 0;
-                                    MediaMetadataRetriever mmr = new MediaMetadataRetriever();
-                                    try {
-                                        mmr.setDataSource(f.getAbsolutePath());
-                                        iDuration = Integer.valueOf(mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)) / 1000;
-                                    } catch (Exception e) {
-                                        e.printStackTrace();
-                                    }
-                                    StringBuilder sb = new StringBuilder();
-                                    if (iDuration >= 3600) {
-                                        sb.append(iDuration / 3600);
-                                        sb.append(":");
-                                        iDuration = iDuration % 3600;
-                                    }
-                                    if (iDuration > 60) {
-                                        sb.append(String.format("%02d", iDuration / 60));
-                                        sb.append(":");
-                                        iDuration = iDuration % 60;
-                                    } else {
-                                        sb.append("00:");
-                                    }
-                                    sb.append(String.format("%02d", iDuration));
-                                    MediaPath mediaPath = new MediaPath(TaskType.VIDEO, f.getAbsolutePath(), sb.toString());
-                                    l.get(1).files.add(mediaPath);
-                                    sortHelps.add(new SortHelp((int) (f.lastModified() / 1000), f.getAbsolutePath(), TaskType.VIDEO, sb.toString()));
-                                }
-                            }
-                        }
-                    }
-                    Collections.sort(sortHelps, new Comparator<SortHelp>() {
-                        @Override
-                        public int compare(SortHelp lhs, SortHelp rhs) {
-                            return compareLong(rhs.modifyTime, lhs.modifyTime);
-                        }
-                    });
-                    for (SortHelp i : sortHelps) {
-                        l.get(0).files.add(i.mediaPath);
-                    }
-                    //该显示的名称，比如DCIM文件夹改为相机
-                    String p = Environment.getExternalStorageDirectory().getAbsolutePath().toLowerCase();
-                    for (int i = hasVideo ? 2 : 1; i < l.size(); i++) {
-                        FolderBean folderBean = l.get(i);
-                        if (folderBean.folder != null) {
-                            String tempS = folderBean.folder.getAbsolutePath().toLowerCase();
-                            if (tempS.equals(p + "/ucdownloads")) {
-                                folderBean.folderName = "UC下载";
-                            }
-                            if (tempS.equals(p + "/download")) {
-                                folderBean.folderName = "下载";
-                            }
-                            if (tempS.equals(p + "/dcim/camera")) {
-                                folderBean.folderName = "相机相册";
-                            }
-                            if (tempS.equals(p + "/dcim/xiaoenai")) {
-                                folderBean.folderName = "小恩爱";
-                            }
-                            if (tempS.equals(p + "/tencent/qq_images")) {
-                                folderBean.folderName = "QQ保存";
-                            }
-                            if (tempS.equals(p + "/tencent/qqfile_recv")) {
-                                folderBean.folderName = "QQ接收";
-                            }
-                            if (tempS.equals(p + "/tencent/micromsg/weixin")) {
-                                folderBean.folderName = "微信";
-                            }
-                            if (tempS.equals(p + "/tencent/qqlite_images")) {
-                                folderBean.folderName = "QQ轻聊版保存";
-                            }
-                        }
-
-                    }
-                    if (hasVideo && l.get(1).files.size() <= 0) {
-                        l.remove(1);
-                    }
-
-                    Message message = imageLoaderHandler.obtainMessage();
-                    message.arg1 = ImageLoaderHandler.SCAN_FINISH;
-                    message.sendToTarget();
                 }
+                // Get Images from MediaStore.
+                if (hasVideo) {
+                    Cursor cursor = getContentResolver().query(MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
+                            new String[]{
+                                    MediaStore.Video.Media.DATA, MediaStore.Video.Media.DATE_MODIFIED, MediaStore.Video.Media.DURATION},
+                            null,
+                            null,
+                            null);
+                    if (cursor != null) {
+                        while (cursor.moveToNext()) {
+                            MediaPath mediaPath = new MediaPath(true, cursor.getString(0),
+                                    cursor.getLong(1) * 1000,
+                                    ImageTools.getDurationString(cursor.getLong(2)));
+                            if (new File(mediaPath.path).exists()) {
+                                alreadyHave.add(mediaPath.path.toLowerCase());
+                                if (hasImage) {
+                                    allFilesFolder.files.add(mediaPath);
+                                }
+                                allVideoFolder.files.add(mediaPath);
+                            }
+                        }
+                        cursor.close();
+                    }
+                }
+                // Sort Images.
+                if (hasImage) {
+                    Collections.sort(allFilesFolder.files);
+                    for (FolderBean i : subFolder.values()) {
+                        Collections.sort(i.files);
+                    }
+                }
+                // Sort Videos.
+                if (hasVideo) {
+                    Collections.sort(allVideoFolder.files);
+                }
+                Message message = imageLoaderHandler.obtainMessage(ImageLoaderHandler.SCAN_FINISH);
+                message.sendToTarget();
             }
         }.start();
-    }
-
-    /**
-     * 将set中数据放入List中，同时去重（大小写）
-     *
-     * @param src
-     * @param des
-     */
-    private void fromSetToList(Set<String> src, List<String> des) {
-        for (String i : src) {
-            String temp = i.toLowerCase();
-            if (i.length() > 0) {
-                File f = new File(i);
-                if (f.isDirectory() && f.exists() && f.canRead()) {
-                    boolean flag = false;
-                    for (int ll = 0; ll < des.size(); ll++) {
-                        if (des.get(ll).toLowerCase().equals(temp)) {
-                            flag = true;
-                            break;
-                        }
-                    }
-                    if (!flag) {
-                        des.add(i);
-                    }
-                }
-            }
-        }
     }
 
     private void initViews() {
@@ -382,21 +435,21 @@ public class ImageLoaderActivity extends AppCompatActivity implements PopupWindo
         mDirCount = (TextView) findViewById(R.id.select_image_dir_count);
         gridView = (GridView) findViewById(R.id.select_image_grid_view);
         bottomLayout = (RelativeLayout) findViewById(R.id.select_image_bottom_layout);
-
     }
 
 
     @Override
-    public void OnSelected(int position) {
+    public void OnSelected(FolderBean selected) {
         mPopupWindowListDir.dismiss();
-        setTitle(l.get(position).folderName);
+        setTitle(selected.folderName);
         //ImageLoader.getInstance().clearWaitingTasks();
-        initAdapter(position);
+        initAdapter(selected);
     }
 
     @Override
     protected void onDestroy() {
         //ImageLoader.getInstance().setShouldStop();
+        scanWholeSDThreadShouldStop = true;
         super.onDestroy();
     }
 
@@ -405,7 +458,6 @@ public class ImageLoaderActivity extends AppCompatActivity implements PopupWindo
         int id = item.getItemId();
         switch (id) {
             case R.id.menu_image_loader_send:
-
                 Intent i = new Intent();
                 Bundle bundle = new Bundle();
                 MediaPath[] paths = new MediaPath[mSelected.size()];

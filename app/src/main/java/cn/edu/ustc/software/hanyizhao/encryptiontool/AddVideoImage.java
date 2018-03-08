@@ -1,20 +1,20 @@
 package cn.edu.ustc.software.hanyizhao.encryptiontool;
 
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Message;
 import android.os.Parcelable;
-import android.util.Log;
+import android.provider.MediaStore;
 
 import java.io.File;
 
-import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.Logger;
-import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.MediaPath;
-import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.TaskType;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.service.StaticData;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.FileTools;
+import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.Logger;
+import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.MediaPath;
 
 /**
  * Created by HanYizhao on 2015/12/28.
@@ -22,16 +22,30 @@ import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.FileTools;
  */
 public class AddVideoImage {
 
-    public static void ScanFile(String[] paths, Context context) {
-        for(String i: paths) {
-            context.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(new File(i))));
-        }
-//        MediaScannerConnection.scanFile(context, paths, null, new MediaScannerConnection.OnScanCompletedListener() {
-//            @Override
-//            public void onScanCompleted(String path, Uri uri) {
-//                Logger.e("MediaScanner Listen", "completed " + path);
+    public static void ScanFile(String[] paths, Context context, boolean isVideo) {
+//        for (String i : paths) {
+//            ContentValues values = new ContentValues();
+//            values.put(MediaStore.MediaColumns.DISPLAY_NAME, new File(i).getName());
+//            if (isVideo) {
+//                values.put(MediaStore.Video.Media.DATA, i);
+//                context.getContentResolver().insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values);
+//            } else {
+//                values.put(MediaStore.Images.Media.DATA, i);
+//                context.getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
 //            }
-//        });
+//        }
+
+//        for (String i : paths) {
+//            context.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE, Uri.fromFile(new File(i))));
+//        }
+
+
+        MediaScannerConnection.scanFile(context, paths, null, new MediaScannerConnection.OnScanCompletedListener() {
+            @Override
+            public void onScanCompleted(String path, Uri uri) {
+                Logger.e("MediaScanner Listen", "completed " + path);
+            }
+        });
     }
 
     public static void addVideoAndImage(Intent data, final Context context, final FragmentHandler handler) {
@@ -43,7 +57,7 @@ public class AddVideoImage {
                 if (selected != null) {
                     for (Parcelable i : selected) {
                         MediaPath mp = (MediaPath) i;
-                        if (mp.type.compareTo(TaskType.IMAGE) == 0) {
+                        if (!mp.isVideo) {
                             //图片
                             int id = StaticData.getInstance().addImage(mp.path);
                             if (id != -1) {
@@ -67,7 +81,7 @@ public class AddVideoImage {
                                     Logger.e("AddImage", mp.path);
                                 }
                             }
-                        } else if (mp.type.compareTo(TaskType.VIDEO) == 0) {
+                        } else {
                             //视频
                             int id = StaticData.getInstance().addVideo(mp.path, mp.duration);
                             if (id != -1) {

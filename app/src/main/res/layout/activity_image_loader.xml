@@ -28,32 +28,6 @@
         android:clipChildren="false">
 
         <TextView
-            android:id="@+id/select_image_dir_name"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentLeft="true"
-            android:layout_centerVertical="true"
-            android:paddingLeft="10dp"
-            android:textColor="@android:color/black"
-            android:textSize="16sp" />
-
-        <RelativeLayout
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_centerVertical="true"
-            android:layout_toRightOf="@id/select_image_dir_name">
-
-            <ImageView
-                android:layout_width="9dp"
-                android:layout_height="9dp"
-                android:layout_marginLeft="5dp"
-                android:layout_marginTop="6dp"
-                android:scaleType="centerCrop"
-                android:src="@drawable/triangle_black" />
-        </RelativeLayout>
-
-
-        <TextView
             android:id="@+id/select_image_dir_count"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
@@ -62,5 +36,44 @@
             android:paddingRight="10dp"
             android:textColor="@android:color/black"
             android:textSize="16sp" />
+
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_toLeftOf="@id/select_image_dir_count">
+
+
+            <TextView
+                android:id="@+id/select_image_dir_name"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginRight="30dp"
+                android:ellipsize="end"
+                android:paddingLeft="10dp"
+                android:singleLine="true"
+                android:textColor="@android:color/black"
+                android:textSize="16sp" />
+
+            <RelativeLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_marginLeft="-25dp"
+                android:layout_marginRight="10dp"
+                android:layout_toRightOf="@id/select_image_dir_name">
+
+                <ImageView
+                    android:layout_width="9dp"
+                    android:layout_height="9dp"
+                    android:layout_marginTop="6dp"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/triangle_black" />
+            </RelativeLayout>
+
+
+        </RelativeLayout>
+
+
     </RelativeLayout>
 </RelativeLayout>

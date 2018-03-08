@@ -3,14 +3,11 @@ package cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader;
 import android.graphics.Bitmap;
 import android.os.Message;
 import android.support.v4.util.LruCache;
-import android.util.Log;
 import android.widget.ImageView;
 
-import cn.edu.ustc.software.hanyizhao.encryptiontool.service.StaticData;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.Logger;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.UIHandler.UIHandlerData;
-import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.ImageTools;
-import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.TaskType;
+import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.CanGetThumbnailLater;
 
 import java.lang.ref.WeakReference;
 import java.util.LinkedList;
@@ -58,7 +55,7 @@ public class ImageLoader {
      * @param imageView
      * @param no_photo_id
      */
-    public void loadImage(String path, ImageView imageView, Integer no_photo_id, TaskType taskType) {
+    public void loadImage(String path, ImageView imageView, Integer no_photo_id, CanGetThumbnailLater canDoTask) {
         if (uiHandler == null) {
             uiHandler = new UIHandler();
         }
@@ -72,9 +69,9 @@ public class ImageLoader {
             else
                 imageView.setImageBitmap(null);
             OneTask oneTask = new OneTask();
-            oneTask.imgView = new WeakReference<ImageView>(imageView);
+            oneTask.imgView = new WeakReference<>(imageView);
             oneTask.Path = path;
-            oneTask.taskType = taskType;
+            oneTask.canGetThumbnailLater = canDoTask;
             synchronized (tasks) {
                 tasks.push(oneTask);
             }
@@ -97,28 +94,13 @@ public class ImageLoader {
     private class OneTask {
         public WeakReference<ImageView> imgView;
         public String Path;
-        public TaskType taskType;
+        public CanGetThumbnailLater canGetThumbnailLater;
 
         public void doTheTask() {
             ImageView imageView2 = imgView.get();
             if (imageView2 != null && imageView2.getTag().toString().equals(Path)) {
                 Bitmap bitmap = null;
-                switch (taskType) {
-                    case IMAGE:
-                        bitmap = ImageTools.getThumbnail(Path, imageView2.getLayoutParams().width);
-                        break;
-                    case VIDEO:
-                        bitmap = ImageTools.getVideoImage(Path, imageView2.getLayoutParams().width);
-                        break;
-                    case IMAGE_DB_VIDEO: {
-                        bitmap = StaticData.getInstance().getTh(Integer.valueOf(Path.substring(5)), true);
-                        break;
-                    }
-                    case IMAGE_DB_IMAGE: {
-                        bitmap = StaticData.getInstance().getTh(Integer.valueOf(Path.substring(5)), false);
-                        break;
-                    }
-                }
+                bitmap = canGetThumbnailLater.getThumbnailLaterMaybe(Path, imageView2.getLayoutParams().width);
                 if (bitmap != null) {
                     mLruCache.put(Path, bitmap);
                     Message message = Message.obtain();

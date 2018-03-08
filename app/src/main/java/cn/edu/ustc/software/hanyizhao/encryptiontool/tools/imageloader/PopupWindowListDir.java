@@ -17,6 +17,8 @@ import android.widget.PopupWindow;
 import android.widget.TextView;
 
 import cn.edu.ustc.software.hanyizhao.encryptiontool.R;
+import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.DefaultImageThumbnailGetter;
+import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.DefaultVideoThumbnailGetter;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.DisplayUtil;
 import cn.edu.ustc.software.hanyizhao.encryptiontool.tools.imageloader.bean.FolderBean;
 
@@ -31,11 +33,10 @@ public class PopupWindowListDir extends PopupWindow {
     int mHeight;
     private View mConvertView;
     private Context mContext;
-    List<FolderBean> folders;
+    private List<FolderBean> folders;
     private ListView mListView;
     private DirAdapter mDirAdapter;
     private WeakReference<OnPopupWindowListDirSelectListener> listener;
-    private int nowPosition = 0;
 
     public PopupWindowListDir(Context context, List<FolderBean> folders) {
         mContext = context;
@@ -66,9 +67,14 @@ public class PopupWindowListDir extends PopupWindow {
         initEvent();
     }
 
+    public void refreshFolderBean(List<FolderBean> folders) {
+        this.folders = folders;
+        mDirAdapter.notifyDataSetChanged();
+    }
+
     private void initViews() {
         mListView = (ListView) mConvertView.findViewById(R.id.select_image_pop_up_listView);
-        mDirAdapter = new DirAdapter(mContext, folders);
+        mDirAdapter = new DirAdapter(mContext);
         mListView.setAdapter(mDirAdapter);
     }
 
@@ -76,22 +82,24 @@ public class PopupWindowListDir extends PopupWindow {
         mListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                nowPosition = position;
+                for (int i = 0; i < folders.size(); i++) {
+                    folders.get(i).isSelected = i == position;
+                }
                 mDirAdapter.notifyDataSetChanged();
                 OnPopupWindowListDirSelectListener l;
                 if (listener != null && (l = listener.get()) != null) {
-                    l.OnSelected(position);
+                    l.OnSelected(folders.get(position));
                 }
             }
         });
     }
 
     public void setOnPopupWindowListDirSelectListener(OnPopupWindowListDirSelectListener listener) {
-        this.listener = new WeakReference<OnPopupWindowListDirSelectListener>(listener);
+        this.listener = new WeakReference<>(listener);
     }
 
     public interface OnPopupWindowListDirSelectListener {
-        void OnSelected(int position);
+        void OnSelected(FolderBean selected);
     }
 
     private void getWidthAndHeight(Context context) {
@@ -106,25 +114,19 @@ public class PopupWindowListDir extends PopupWindow {
     private class DirAdapter extends BaseAdapter {
 
         private LayoutInflater mInflater;
-        List<FolderBean> mFolders;
 
-        public DirAdapter(Context context, List<FolderBean> folders) {
+        public DirAdapter(Context context) {
             mInflater = LayoutInflater.from(context);
-            mFolders = folders;
         }
 
         @Override
         public int getCount() {
-            if (folders.get(0).files.size() > 0) {
-                return folders.size();
-            } else {
-                return 0;
-            }
+            return PopupWindowListDir.this.folders.size();
         }
 
         @Override
         public Object getItem(int position) {
-            return folders.get(position).folderName;
+            return PopupWindowListDir.this.folders.get(position).folderName;
         }
 
         @Override
@@ -153,36 +155,41 @@ public class PopupWindowListDir extends PopupWindow {
             } else {
                 viewHolder.view.getLayoutParams().height = 0;
             }
-            if (position == 1 && !mFolders.get(1).briefMode) {
+            if (folders.get(position).isVideoFolder) {
                 viewHolder.imageViewStart.setVisibility(View.VISIBLE);
             } else {
                 viewHolder.imageViewStart.setVisibility(View.INVISIBLE);
             }
-            String path;
-            FolderBean bean = mFolders.get(position);
-            if (bean.briefMode) {
-                path = bean.folder.getAbsolutePath() + "/" + bean.files.get(0).path;
-            } else {
-                path = bean.files.get(0).path;
+            String path = null;
+            FolderBean bean = folders.get(position);
+            if (bean.files.size() > 0) {
+                if (bean.briefMode) {
+                    path = bean.folder.getAbsolutePath() + "/" + bean.files.get(0).path;
+                } else {
+                    path = bean.files.get(0).path;
+                }
             }
-            if (nowPosition != position) {
+            if (!PopupWindowListDir.this.folders.get(position).isSelected) {
                 viewHolder.imageViewIndicator.setImageBitmap(null);
             } else {
                 viewHolder.imageViewIndicator.setImageResource(R.drawable.indicator);
             }
-            ImageLoader.getInstance().loadImage(path, viewHolder.imageView, null, bean.files.get(0).type);
+            if (path != null) {
+                ImageLoader.getInstance().loadImage(path, viewHolder.imageView, null,
+                        bean.files.get(0).isVideo ? DefaultVideoThumbnailGetter.getInstance() : DefaultImageThumbnailGetter.getInstance());
+            }
             viewHolder.textViewDirCount.setText(bean.files.size() + "张");
             viewHolder.textViewDirName.setText(bean.folderName);
             return convertView;
         }
 
         private class ViewHolder {
-            public ImageView imageView;
-            public TextView textViewDirName;
-            public TextView textViewDirCount;
-            public ImageView imageViewIndicator;
-            public View view;
-            public ImageView imageViewStart;
+            ImageView imageView;
+            TextView textViewDirName;
+            TextView textViewDirCount;
+            ImageView imageViewIndicator;
+            View view;
+            ImageView imageViewStart;
         }
     }
 }
